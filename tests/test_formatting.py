@@ -590,6 +590,54 @@ def test_help_formatter_write_usage(
     assert f.getvalue() == expected
 
 
+def test_write_usage_does_not_break_options_at_hyphens():
+    """Option names in the usage line are not split at their hyphens.
+
+    ``textwrap`` breaks compound words at hyphens by default, which turns a
+    single option such as ``--max-retry-count`` into what reads as two
+    separate options spread over consecutive lines.
+    """
+    options = [
+        "--enable-verbose-logging",
+        "--output-file-path",
+        "--max-retry-count",
+        "--disable-cache-mode",
+        "--config-file-location",
+        "--user-auth-token",
+        "--auto-update-interval",
+        "--force-overwrite-existing",
+        "--network-timeout-seconds",
+        "--debug-trace-enabled",
+    ]
+    f = click.HelpFormatter(width=65)
+    f.write_usage("program", " ".join(options))
+    assert f.getvalue() == (
+        "Usage: program --enable-verbose-logging --output-file-path\n"
+        "               --max-retry-count --disable-cache-mode\n"
+        "               --config-file-location --user-auth-token\n"
+        "               --auto-update-interval --force-overwrite-existing\n"
+        "               --network-timeout-seconds --debug-trace-enabled\n"
+    )
+
+
+def test_write_usage_long_prefix_does_not_break_options_at_hyphens():
+    """Hyphens are also preserved when args are placed on their own line."""
+    f = click.HelpFormatter(width=38)
+    f.write_usage("a-very-long-program-name", "--max-retry-count --output-file-path")
+
+    assert f.getvalue() == (
+        "Usage: a-very-long-program-name \n"
+        "           --max-retry-count\n"
+        "           --output-file-path\n"
+    )
+
+
+def test_wrap_text_still_breaks_prose_on_hyphens():
+    """Ordinary help text keeps the default hyphen-breaking behavior."""
+    wrapped = click.formatting.wrap_text("aaaa bbbb cccc well-known-compound", 20)
+    assert wrapped == "aaaa bbbb cccc well-\nknown-compound"
+
+
 def test_help_formatter_write_usage_without_args_styled_prefix():
     """A downstream-styled prefix is preserved when ``args`` is empty:
     the ANSI escape sequences survive, only the trailing separator is

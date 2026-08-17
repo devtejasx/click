@@ -34,6 +34,7 @@ def wrap_text(
     initial_indent: str = "",
     subsequent_indent: str = "",
     preserve_paragraphs: bool = False,
+    break_on_hyphens: bool = True,
 ) -> str:
     """A helper function that intelligently wraps text.  By default, it
     assumes that it operates on a single paragraph of text but if the
@@ -52,6 +53,12 @@ def wrap_text(
                               each consecutive line.
     :param preserve_paragraphs: if this flag is set then the wrapping will
                                 intelligently handle paragraphs.
+    :param break_on_hyphens: if this flag is cleared, compound words are not
+                             split at hyphens. Useful for text made up of
+                             option names, which become ambiguous when split.
+
+    .. versionchanged:: 8.5.0
+        Added the ``break_on_hyphens`` parameter.
 
     .. versionchanged:: 8.4.0
         Width is measured in visible characters. ANSI escape sequences in
@@ -67,6 +74,7 @@ def wrap_text(
         initial_indent=initial_indent,
         subsequent_indent=subsequent_indent,
         replace_whitespace=False,
+        break_on_hyphens=break_on_hyphens,
     )
     if not preserve_paragraphs:
         return wrapper.fill(text)
@@ -186,6 +194,7 @@ class HelpFormatter:
                     text_width,
                     initial_indent=usage_prefix,
                     subsequent_indent=indent,
+                    break_on_hyphens=False,
                 )
             )
         else:
@@ -195,7 +204,11 @@ class HelpFormatter:
             indent = " " * (max(self.current_indent, term_len(prefix)) + 4)
             self.write(
                 wrap_text(
-                    args, text_width, initial_indent=indent, subsequent_indent=indent
+                    args,
+                    text_width,
+                    initial_indent=indent,
+                    subsequent_indent=indent,
+                    break_on_hyphens=False,
                 )
             )
 

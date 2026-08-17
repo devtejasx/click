@@ -18,6 +18,11 @@ Unreleased
 - {class}`Path` with `allow_dash=True` no longer triggers a `BytesWarning`,
   an error under `python -bb`, when checking a value against the `-`
   convention. {issue}`2877` {pr}`3642`
+- {meth}`HelpFormatter.write_usage` no longer splits option names at their
+  hyphens when wrapping, so an option such as `--max-retry-count` is never
+  rendered as what reads like two separate options. {func}`wrap_text` accepts
+  a `break_on_hyphens` parameter; other help text is unchanged.
+  {issue}`3362`
 - Add {func}`custom_version_option`, a `--version` option whose output is
   produced by a callback, covering cases {func}`version_option` intentionally
   does not. The feature set of {func}`version_option` is now frozen; see
