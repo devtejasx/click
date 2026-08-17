@@ -696,7 +696,7 @@ class Editor:
                 return editor
         return "vi"
 
-    def edit_files(self, filenames: cabc.Iterable[str]) -> None:
+    def edit_files(self, filenames: cabc.Iterable[str | os.PathLike[str]]) -> None:
         """Open files in the user's editor."""
         import shlex
         import subprocess
@@ -713,7 +713,7 @@ class Editor:
             # in pager(): strips quotes from tokens and preserves quoted
             # Windows paths.
             c = subprocess.Popen(
-                args=shlex.split(editor) + list(filenames),
+                args=shlex.split(editor) + [os.fspath(f) for f in filenames],
                 env=environ,
             )
             exit_code = c.wait()

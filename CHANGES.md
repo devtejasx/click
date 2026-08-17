@@ -18,6 +18,9 @@ Unreleased
 - {class}`Path` with `allow_dash=True` no longer triggers a `BytesWarning`,
   an error under `python -bb`, when checking a value against the `-`
   convention. {issue}`2877` {pr}`3642`
+- {func}`edit` accepts `os.PathLike` values for `filename`, both on their
+  own and inside an iterable. Passing a single `Path` previously raised
+  `TypeError: 'PosixPath' object is not iterable`. {issue}`2869`
 - Add {func}`custom_version_option`, a `--version` option whose output is
   produced by a callback, covering cases {func}`version_option` intentionally
   does not. The feature set of {func}`version_option` is now frozen; see

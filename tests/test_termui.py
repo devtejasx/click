@@ -8,6 +8,7 @@ import shutil
 import sys
 import tempfile
 import time
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -577,6 +578,30 @@ def test_editor_windows_path_normalization(editor_cmd, expected_cmd):
         args = mock_popen.call_args[1].get("args") or mock_popen.call_args[0][0]
         assert args == expected_cmd + ["f.txt"]
         assert mock_popen.call_args[1].get("shell") is None
+
+
+def test_editor_accepts_path_like():
+    """``edit_files`` accepts ``os.PathLike`` filenames alongside ``str``."""
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value.wait.return_value = 0
+        Editor(editor="editor").edit_files([Path("a.txt"), "b.txt"])
+
+        args = mock_popen.call_args[1].get("args") or mock_popen.call_args[0][0]
+        assert args == ["editor", os.fspath(Path("a.txt")), "b.txt"]
+
+
+def test_edit_accepts_a_single_path():
+    """``edit(filename=Path(...))`` is treated as one file, not an iterable.
+
+    A ``Path`` is not iterable, so before this was handled it raised
+    ``TypeError: 'PosixPath' object is not iterable``.
+    """
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value.wait.return_value = 0
+        click.edit(editor="editor", filename=Path("only.txt"))
+
+        args = mock_popen.call_args[1].get("args") or mock_popen.call_args[0][0]
+        assert args == ["editor", os.fspath(Path("only.txt"))]
 
 
 def test_editor_env_passed_through():
