@@ -3549,3 +3549,53 @@ def test_flag_value_on_option_with_zero_or_one_args(flag_type, args, expect_outp
     result = runner.invoke(cmd, args)
     assert result.exit_code == 0
     assert result.output == expect_output
+
+
+@pytest.mark.parametrize(
+    ("args", "expected_calls", "expected"),
+    [
+        # The flag alone must reach the command as the callback rewrote it, not
+        # as the raw sentinel the parser stored under the shared name.
+        (["--fetch"], 1, "foo"),
+        # The value option alone is untouched by the flag.
+        (["--custom", "bar"], 0, "bar"),
+        # Whichever option comes last on the command line wins.
+        (["--custom", "bar", "--fetch"], 1, "foo"),
+        # Order matters at the parser level too: the later ``--custom`` has
+        # already replaced the sentinel in the shared slot, so the callback
+        # never sees it and does no work. Unchanged by this fix.
+        (["--fetch", "--custom", "bar"], 0, "bar"),
+        # Neither given: the shared slot falls back to the default.
+        ([], 0, None),
+    ],
+)
+def test_shared_name_flag_does_not_leak_raw_value(runner, args, expected_calls, expected):
+    """A value option must not re-consume a sibling flag's parsed value.
+
+    The parser keys its ``opts`` by parameter name, so options sharing a name
+    share the slot. ``--custom`` was picking the sentinel ``--fetch`` had
+    stored, claiming COMMANDLINE for itself, and overwriting the value
+    ``--fetch``'s callback had already produced.
+
+    Regression test for https://github.com/pallets/click/issues/2786
+    """
+    sentinel = "$_fetch"
+    calls = []
+
+    def callback(ctx, param, value):
+        if value is sentinel:
+            calls.append(param)
+            return "foo"
+        return value
+
+    @click.command()
+    @click.option("--custom", "custom")
+    @click.option("--fetch", "custom", flag_value=sentinel, callback=callback)
+    def cli(custom):
+        click.echo(repr(custom), nl=False)
+
+    result = runner.invoke(cli, args)
+    assert result.exit_code == 0, result.output
+    assert result.output == repr(expected)
+    # The callback must not be re-run by the sibling option.
+    assert len(calls) == expected_calls

@@ -83,8 +83,13 @@ def test_param_squatting_help_option_name(runner):
     with pytest.warns(UserWarning, match="reserved for the automatic help option"):
         result = runner.invoke(cli, ["value"])
 
-    # The collision still breaks parsing, but no longer silently.
-    assert result.exit_code == 2
+    # The warning is the contract here. Parsing itself now survives the
+    # collision: the help option no longer claims the argument's value out of
+    # the shared name slot, so it is delivered to the command instead of
+    # failing as "Invalid value for '--help'".
+    # Refs: https://github.com/pallets/click/issues/2786
+    assert result.exit_code == 0
+    assert result.output == "value\n"
 
 
 def test_option_reusing_help_flag(runner):

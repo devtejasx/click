@@ -335,6 +335,7 @@ class Context:
     _depth: int
     _parameter_source: dict[str, ParameterSource]
     _param_default_explicit: dict[str, bool]
+    _parsed_params: set[Parameter] | None
     _exit_stack: ExitStack
 
     def __init__(
@@ -511,6 +512,12 @@ class Context:
         # parameter name and both fall back to their default value.
         # Refs: https://github.com/pallets/click/issues/3403
         self._param_default_explicit = {}
+        # The parameters the parser actually matched on the command line, or
+        # ``None`` before parsing has run. Options that share a parameter name
+        # also share a slot in the parser's ``opts``, so the name alone cannot
+        # say which of them the user typed.
+        # Refs: https://github.com/pallets/click/issues/2786
+        self._parsed_params = None
         self._exit_stack = ExitStack()
 
     @property
@@ -1368,6 +1375,7 @@ class Command:
 
         parser = self.make_parser(ctx)
         opts, args, param_order = parser.parse_args(args=args)
+        ctx._parsed_params = set(param_order)
 
         for param in iter_params_for_processing(param_order, self.get_params(ctx)):
             _, args = param.handle_parse_result(ctx, opts, args)
@@ -2493,6 +2501,19 @@ class Parameter(ABC):
         """
         # Collect from the parse the value passed by the user to the CLI.
         value = opts.get(self.name, UNSET)
+
+        # The parser keys ``opts`` by parameter name, so options that share a name
+        # share the slot. Finding a value there does not mean *this* option was the
+        # one typed, and claiming COMMANDLINE for a parameter the user never gave
+        # lets it outrank the sibling that really was given.
+        # Refs: https://github.com/pallets/click/issues/2786
+        if (
+            value is not UNSET
+            and ctx._parsed_params is not None
+            and self not in ctx._parsed_params
+        ):
+            value = UNSET
+
         # If the value is set, it means it was sourced from the command line by the
         # parser, otherwise it left unset by default.
         source = (
