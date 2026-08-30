@@ -116,6 +116,20 @@ def _format_deprecated_suffix(deprecated: bool | str) -> str:
     return ""
 
 
+def _echo_best_effort(message: str | None = None) -> None:
+    """Write an abort notice to stderr, tolerating a further interrupt.
+
+    Ctrl-C arriving while the abort is being reported would otherwise
+    replace a clean ``Abort`` with an unhandled ``KeyboardInterrupt``
+    traceback, since ``echo`` touches the stream (``isatty``) before
+    writing.
+    """
+    try:
+        echo(message, file=sys.stderr)
+    except KeyboardInterrupt:
+        pass
+
+
 def batch(iterable: cabc.Iterable[V], batch_size: int) -> list[tuple[V, ...]]:
     return list(zip(*repeat(iter(iterable), batch_size), strict=False))
 
@@ -1561,7 +1575,7 @@ class Command:
                     # by its truthiness/falsiness
                     ctx.exit()
             except (EOFError, KeyboardInterrupt) as e:
-                echo(file=sys.stderr)
+                _echo_best_effort()
                 raise Abort() from e
             except ClickException as e:
                 if not standalone_mode:
@@ -1591,7 +1605,7 @@ class Command:
         except Abort:
             if not standalone_mode:
                 raise
-            echo(_("Aborted!"), file=sys.stderr)
+            _echo_best_effort(_("Aborted!"))
             sys.exit(1)
 
     def _main_shell_completion(

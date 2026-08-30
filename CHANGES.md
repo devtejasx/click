@@ -2,6 +2,9 @@
 
 Unreleased
 
+- A second `Ctrl-C` arriving while an abort is being reported no longer
+  replaces the clean abort with an unhandled `KeyboardInterrupt`
+  traceback. {issue}`3802`
 - Add built-in shell completion support for PowerShell (Windows PowerShell
   5.1+ and pwsh 7+) alongside the existing `bash`, `zsh`, and `fish`
   completers. Use `_FOO_BAR_COMPLETE=powershell_source foo-bar` to generate

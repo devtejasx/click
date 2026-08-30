@@ -1768,3 +1768,35 @@ def test_hide_input_value_never_leaks_when_err_true(runner):
     result = runner.invoke(cli, input="leaky\n", mix_stderr=False)
     assert "leaky" not in result.stdout
     assert "leaky" not in result.stderr
+
+
+def test_abort_survives_a_second_interrupt(monkeypatch):
+    """Ctrl-C landing while the abort is being reported must not escape.
+
+    ``echo`` touches the stream before writing (``isatty``), so a second
+    interrupt there turned a clean ``Abort`` into an unhandled
+    ``KeyboardInterrupt`` traceback.
+    """
+
+    @click.command()
+    def cli():
+        # What click.prompt() raises when the user hits Ctrl-C.
+        raise KeyboardInterrupt
+
+    real_echo = click.core.echo
+    stderr_writes = []
+
+    def flaky_echo(message=None, *args, **kwargs):
+        if kwargs.get("file") is sys.stderr:
+            stderr_writes.append(message)
+            raise KeyboardInterrupt
+        return real_echo(message, *args, **kwargs)
+
+    monkeypatch.setattr(click.core, "echo", flaky_echo)
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main([], "cli", standalone_mode=True)
+
+    assert exc_info.value.code == 1
+    # Both stderr writes on the abort path were attempted.
+    assert stderr_writes == [None, "Aborted!"]
