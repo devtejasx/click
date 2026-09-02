@@ -2,6 +2,10 @@
 
 Unreleased
 
+- {meth}`Command.to_info_dict` includes a `usage` key holding the command's
+  usage line, rendered against the context it is called with, so a subcommand
+  reports the full path a user would type. {issue}`2992`
+
 ## Version 8.5.0
 
 Released 2026-08-24

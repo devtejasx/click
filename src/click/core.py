@@ -1085,6 +1085,7 @@ class Command:
             "short_help": self.short_help,
             "hidden": self.hidden,
             "deprecated": self.deprecated,
+            "usage": self.get_usage(ctx),
         }
 
     def __repr__(self) -> str:

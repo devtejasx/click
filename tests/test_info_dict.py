@@ -74,6 +74,9 @@ HELLO_COMMAND = (
         "short_help": None,
         "hidden": False,
         "deprecated": False,
+        # A context built straight from the command has no info_name, so the
+        # command path in the usage line is empty.
+        "usage": "Usage:  [OPTIONS]",
     },
 )
 HELLO_GROUP = (
@@ -86,8 +89,11 @@ HELLO_GROUP = (
         "short_help": None,
         "hidden": False,
         "deprecated": False,
-        "commands": {"hello": HELLO_COMMAND[1]},
+        "commands": {
+            "hello": {**HELLO_COMMAND[1], "usage": "Usage: hello [OPTIONS]"}
+        },
         "chain": False,
+        "usage": "Usage:  [OPTIONS] COMMAND [ARGS]...",
     },
 )
 
@@ -233,7 +239,16 @@ def test_parameter(obj, expect):
                 "hidden": False,
                 "deprecated": False,
                 "commands": {
-                    "cli": HELLO_GROUP[1],
+                    "cli": {
+                        **HELLO_GROUP[1],
+                        "usage": "Usage: cli [OPTIONS] COMMAND [ARGS]...",
+                        "commands": {
+                            "hello": {
+                                **HELLO_COMMAND[1],
+                                "usage": "Usage: cli hello [OPTIONS]",
+                            }
+                        },
+                    },
                     "test": {
                         "name": "test",
                         "params": [NAME_ARGUMENT[1], HELP_OPTION[1]],
@@ -242,9 +257,11 @@ def test_parameter(obj, expect):
                         "short_help": None,
                         "hidden": False,
                         "deprecated": False,
+                        "usage": "Usage: test [OPTIONS] NAME",
                     },
                 },
                 "chain": False,
+                "usage": "Usage:  [OPTIONS] COMMAND [ARGS]...",
             },
             id="Nested Group",
         ),
@@ -254,6 +271,37 @@ def test_command(obj, expect):
     ctx = click.Context(obj)
     out = obj.to_info_dict(ctx)
     assert out == expect
+
+
+def test_command_usage_follows_the_context():
+    """The usage line is rendered against each command's own context, so a
+    subcommand reports the path a user would actually type."""
+
+    @click.group()
+    def cli():
+        pass
+
+    @cli.group()
+    def db():
+        pass
+
+    @db.command()
+    @click.argument("name")
+    @click.option("--force", is_flag=True)
+    def drop(name, force):
+        pass
+
+    ctx = click.Context(cli, info_name="tool")
+    info = ctx.to_info_dict()["command"]
+
+    assert info["usage"] == "Usage: tool [OPTIONS] COMMAND [ARGS]..."
+    assert (
+        info["commands"]["db"]["usage"] == "Usage: tool db [OPTIONS] COMMAND [ARGS]..."
+    )
+    assert (
+        info["commands"]["db"]["commands"]["drop"]["usage"]
+        == "Usage: tool db drop [OPTIONS] NAME"
+    )
 
 
 def test_context():
