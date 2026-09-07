@@ -56,6 +56,13 @@ The {func}`echo` function supports ANSI colors and styles. It will
 automatically strip ANSI color codes if the stream is not connected to a
 terminal.
 
+Two environment variables override that decision, so that colors can be
+turned off on a terminal or kept on a stream that is not one, such as a CI
+log. Setting [`NO_COLOR`](https://no-color.org) to a non-empty value strips
+the codes; setting [`FORCE_COLOR`](https://force-color.org) to a non-empty
+value keeps them. `NO_COLOR` wins if both are set. Passing `color` to
+{func}`echo`, or setting it on the {class}`Context`, overrides both.
+
 ```{admonition} Older Windows Support
 :class: note
 

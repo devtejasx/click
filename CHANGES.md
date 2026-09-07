@@ -11,6 +11,9 @@ Unreleased
   returns `None` for hidden options, so help screens are unchanged. {pr}`3821`
 - Document which types are inferred from `default`, and what an unrecognized
   `type` callable does to a command-line value. {issue}`3036` {pr}`3808`
+- Honor the `NO_COLOR` and `FORCE_COLOR` environment variables when no explicit
+  color preference is given, so that colored output can be kept on a CI log or
+  turned off on a terminal. `NO_COLOR` wins if both are set. {issue}`3022`
 
 ## Version 8.5.0
 

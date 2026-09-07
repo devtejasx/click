@@ -115,10 +115,48 @@ def test_should_strip_ansi(
     monkeypatch.setattr(
         click._compat, "_is_jupyter_kernel_output", lambda x: is_jupyter
     )
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
 
     if expected_override is not None:
         expected = expected_override
     assert click._compat.should_strip_ansi(stream=stream, color=color) == expected
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ({"NO_COLOR": "1"}, True),
+        ({"FORCE_COLOR": "1"}, False),
+        # an empty value is not a preference, so the stream decides
+        ({"NO_COLOR": ""}, True),
+        ({"FORCE_COLOR": ""}, True),
+        # a user who cannot read colored output is not overridden
+        ({"NO_COLOR": "1", "FORCE_COLOR": "1"}, True),
+    ],
+)
+def test_should_strip_ansi_env(
+    monkeypatch, env: dict[str, str], expected: bool
+) -> None:
+    # a stream that is not a terminal, which is what FORCE_COLOR is for
+    monkeypatch.setattr(click._compat, "isatty", lambda x: False)
+    monkeypatch.setattr(click._compat, "_is_jupyter_kernel_output", lambda x: False)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+
+    assert click._compat.should_strip_ansi() == expected
+
+
+@pytest.mark.parametrize("color", [True, False])
+def test_explicit_color_beats_env(monkeypatch, color: bool) -> None:
+    monkeypatch.setattr(click._compat, "isatty", lambda x: False)
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("FORCE_COLOR", "1")
+
+    assert click._compat.should_strip_ansi(color=color) is not color
 
 
 @pytest.mark.parametrize("seq", CLICK_EMITTED + CSI_FOREIGN)

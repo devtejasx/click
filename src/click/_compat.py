@@ -509,6 +509,16 @@ def should_strip_ansi(
             # ._termui_impl._PagerWriter handles stripping ansi itself,
             # so we don't need to strip it here
             return False
+
+        # https://no-color.org and https://force-color.org: any non-empty
+        # value expresses a preference. NO_COLOR wins when both are set, so
+        # that a user who cannot read colored output is never overridden.
+        if os.environ.get("NO_COLOR"):
+            return True
+
+        if os.environ.get("FORCE_COLOR"):
+            return False
+
         return not isatty(stream) and not _is_jupyter_kernel_output(stream)
     return not color
 
