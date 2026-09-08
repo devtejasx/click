@@ -275,6 +275,60 @@ class _SourceVarsDict(t.TypedDict):
     prog_name: str
 
 
+def _rejoin_equals(cwords: list[str], cword: int) -> tuple[list[str], int]:
+    """Undo the split Bash performs at ``=``.
+
+    ``=`` is in the default ``COMP_WORDBREAKS``, so Bash hands
+    ``--opt=value`` over as the three words ``--opt``, ``=``, ``value``.
+    Left alone, the ``=`` is parsed as the option's value. Join such runs
+    back into one word and move the cursor index with them.
+    """
+    joined: list[str] = []
+    new_cword = cword
+    i = 0
+
+    while i < len(cwords):
+        if (
+            i + 1 < len(cwords)
+            and cwords[i + 1] == "="
+            and cwords[i].startswith("--")
+            and joined
+        ):
+            value = cwords[i + 2] if i + 2 < len(cwords) else ""
+            consumed = 3 if i + 2 < len(cwords) else 2
+            joined.append(cwords[i] + "=" + value)
+
+            if cword >= i + consumed:
+                new_cword -= consumed - 1
+            elif cword > i:
+                new_cword = len(joined) - 1
+
+            i += consumed
+        else:
+            joined.append(cwords[i])
+            i += 1
+
+    return joined, new_cword
+
+
+def _split_option_value(args: list[str], incomplete: str) -> tuple[list[str], str, str]:
+    """Split an ``--opt=value`` word being completed.
+
+    Returns ``args, incomplete, prefix``. The option joins ``args`` so that
+    the completion is resolved against the option it belongs to, and the
+    value becomes the incomplete word. ``prefix`` is the ``--opt=`` that was
+    removed, for shells that replace the whole word.
+
+    Only long options are split: ``-c=v`` passes ``=v`` as the value of
+    ``-c``, so there is nothing to separate there.
+    """
+    if not incomplete.startswith("--") or "=" not in incomplete:
+        return args, incomplete, ""
+
+    option, _, value = incomplete.partition("=")
+    return [*args, option], value, f"{option}="
+
+
 class ShellComplete:
     """Base class for providing shell completion support. A subclass for
     a given shell will override attributes and methods to implement the
@@ -430,8 +484,14 @@ class BashComplete(ShellComplete):
         return super().source()
 
     def get_completion_args(self) -> tuple[list[str], str]:
+        """
+        .. versionchanged:: 8.5.0
+            ``--opt=value``, which Bash splits at the ``=`` word break, is
+            joined back together so the value is completed against the option.
+        """
         cwords = split_arg_string(os.environ["COMP_WORDS"])
         cword = int(os.environ["COMP_CWORD"])
+        cwords, cword = _rejoin_equals(cwords, cword)
         args = cwords[1:cword]
 
         try:
@@ -439,6 +499,9 @@ class BashComplete(ShellComplete):
         except IndexError:
             incomplete = ""
 
+        # Bash replaces only the text after the last word break, so the
+        # emitted values stay bare and the "--opt=" prefix is dropped.
+        args, incomplete, _ = _split_option_value(args, incomplete)
         return args, incomplete
 
     def format_completion(self, item: CompletionItem[t.Any]) -> str:
@@ -451,7 +514,18 @@ class ZshComplete(ShellComplete):
     name: t.ClassVar[str] = "zsh"
     source_template: t.ClassVar[str] = _SOURCE_ZSH
 
+    #: The ``--opt=`` removed from the word being completed, put back on
+    #: every emitted value. Zsh replaces the whole word, so a bare value
+    #: would overwrite the option along with it.
+    _value_prefix: str = ""
+
     def get_completion_args(self) -> tuple[list[str], str]:
+        """
+        .. versionchanged:: 8.5.0
+            ``--opt=value`` is split so the value is completed against the
+            option instead of the whole word being treated as one incomplete
+            token.
+        """
         cwords = split_arg_string(os.environ["COMP_WORDS"])
         cword = int(os.environ["COMP_CWORD"])
         args = cwords[1:cword]
@@ -461,6 +535,7 @@ class ZshComplete(ShellComplete):
         except IndexError:
             incomplete = ""
 
+        args, incomplete, self._value_prefix = _split_option_value(args, incomplete)
         return args, incomplete
 
     def format_completion(self, item: CompletionItem[str]) -> str:
@@ -477,7 +552,8 @@ class ZshComplete(ShellComplete):
         # thus harder to fix than this method.)
         #
         # See issue #1812 and issue #2703 for further context.
-        value = item.value.replace(":", r"\:") if help_ != "_" else item.value
+        value = f"{self._value_prefix}{item.value}"
+        value = value.replace(":", r"\:") if help_ != "_" else value
         return f"{item.type}\n{value}\n{help_}"
 
 

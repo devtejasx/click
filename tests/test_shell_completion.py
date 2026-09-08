@@ -391,6 +391,84 @@ def test_full_complete(runner, shell, env, expect):
     assert result.output == expect
 
 
+# https://github.com/pallets/click/issues/2847
+#
+# Bash splits "--color=auto" at the "=" in COMP_WORDBREAKS and hands over three
+# words; Zsh keeps it as one. Either way the value has to be completed against
+# the option, and Zsh, which replaces the whole word, needs the "--color=" back
+# on the front of what it is given.
+@pytest.mark.parametrize(
+    ("env", "expect"),
+    [
+        ({"COMP_WORDS": "cli --color =", "COMP_CWORD": "2"}, "auto\nalways\nnever\n"),
+        ({"COMP_WORDS": "cli --color = a", "COMP_CWORD": "3"}, "auto\nalways\n"),
+        ({"COMP_WORDS": "cli --color = al", "COMP_CWORD": "3"}, "always\n"),
+        # the separated spelling is unchanged
+        ({"COMP_WORDS": "cli --color a", "COMP_CWORD": "2"}, "auto\nalways\n"),
+        # an earlier --opt=value is no longer parsed as the value "="
+        (
+            {"COMP_WORDS": "cli --name = x --color = a", "COMP_CWORD": "6"},
+            "auto\nalways\n",
+        ),
+    ],
+)
+@pytest.mark.usefixtures("_patch_for_completion")
+def test_bash_complete_long_option_equals(runner, env, expect):
+    cli = Command(
+        "cli",
+        params=[
+            Option(["--color"], type=Choice(["auto", "always", "never"])),
+            Option(["--name"]),
+        ],
+    )
+    env["_CLI_COMPLETE"] = "bash_complete"
+    result = runner.invoke(cli, env=env)
+    assert result.output == "".join(f"plain,{v}" for v in expect.splitlines(True))
+
+
+@pytest.mark.parametrize(
+    ("env", "expect"),
+    [
+        (
+            {"COMP_WORDS": "cli --color=", "COMP_CWORD": "1"},
+            ["--color=auto", "--color=always", "--color=never"],
+        ),
+        (
+            {"COMP_WORDS": "cli --color=a", "COMP_CWORD": "1"},
+            ["--color=auto", "--color=always"],
+        ),
+        ({"COMP_WORDS": "cli --color=al", "COMP_CWORD": "1"}, ["--color=always"]),
+        # the separated spelling stays bare, because the word being replaced
+        # is the value alone
+        ({"COMP_WORDS": "cli --color a", "COMP_CWORD": "2"}, ["auto", "always"]),
+    ],
+)
+@pytest.mark.usefixtures("_patch_for_completion")
+def test_zsh_complete_long_option_equals(runner, env, expect):
+    cli = Command(
+        "cli", params=[Option(["--color"], type=Choice(["auto", "always", "never"]))]
+    )
+    env["_CLI_COMPLETE"] = "zsh_complete"
+    result = runner.invoke(cli, env=env)
+    assert result.output == "".join(f"plain\n{v}\n_\n" for v in expect)
+
+
+@pytest.mark.usefixtures("_patch_for_completion")
+def test_short_option_equals_is_not_split(runner):
+    """``-c=v`` passes ``=v`` to ``-c``; there is no separator to remove."""
+    cli = Command("cli", params=[Option(["-c", "--color"])])
+    result = runner.invoke(
+        cli,
+        env={
+            "COMP_WORDS": "cli -c=a",
+            "COMP_CWORD": "1",
+            "_CLI_COMPLETE": "zsh_complete",
+        },
+    )
+    # the word is left whole, matches no option, and yields nothing
+    assert not result.output.strip()
+
+
 def test_source_uses_lf_line_endings(monkeypatch):
     stdout = io.BytesIO()
     stream = io.TextIOWrapper(stdout, encoding="utf-8", newline="\r\n")

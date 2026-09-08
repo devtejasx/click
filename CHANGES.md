@@ -15,6 +15,11 @@ Unreleased
   This stripping was lost in `8.4.0` when {pr}`2969` began writing the
   prompt with `input()` directly. {issue}`3572` {pr}`3653`
 - Fix test failures when using pytest >= 9.1. {pr}`3656`
+- Shell completion handles the `--opt=value` spelling of a long option.
+  Bash splits such a word at the `=` in `COMP_WORDBREAKS`, which left the
+  separator itself parsed as the option's value; Zsh kept the word whole, so
+  the value completed against nothing and the accepted completion replaced
+  the option along with it. {issue}`2847`
 - {class}`Path` with `allow_dash=True` no longer triggers a `BytesWarning`,
   an error under `python -bb`, when checking a value against the `-`
   convention. {issue}`2877` {pr}`3642`
