@@ -11,6 +11,10 @@ Unreleased
   returns `None` for hidden options, so help screens are unchanged. {pr}`3821`
 - Document which types are inferred from `default`, and what an unrecognized
   `type` callable does to a command-line value. {issue}`3036` {pr}`3808`
+- `types.convert_type` and `types.FuncParamType` are internal utilities. They are
+  renamed to `_convert_type` and `_FuncParamType`; the old names still work and
+  warn, and will be removed in Click 9.0. `ParamType.to_info_dict` still reports
+  `param_type` as `Func`. {issue}`3847`
 
 ## Version 8.5.0
 

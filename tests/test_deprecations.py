@@ -6,6 +6,7 @@ import click
 import click.core
 import click.parser
 import click.shell_completion
+import click.types
 import click.utils
 
 
@@ -38,6 +39,9 @@ import click.utils
         (click.utils, "make_default_short_help", click.utils._make_default_short_help),
         (click.utils, "PacifyFlushWrapper", click.utils._PacifyFlushWrapper),
         (click.utils, "safecall", click.utils._safecall),
+        # Internal type helpers.
+        (click.types, "convert_type", click.types._convert_type),
+        (click.types, "FuncParamType", click.types._FuncParamType),
         # Version metadata attribute.
         (click, "__version__", importlib.metadata.version("click")),
     ],
@@ -52,7 +56,7 @@ def test_attr_deprecated(module, name, target):
 
 @pytest.mark.parametrize(
     "module",
-    [click, click.core, click.parser, click.utils],
+    [click, click.core, click.parser, click.types, click.utils],
     ids=lambda m: m.__name__,
 )
 def test_unknown_attribute_raises(module):

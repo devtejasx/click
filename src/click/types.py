@@ -117,8 +117,9 @@ class ParamType(t.Generic[_ValueT_co, _InputT_contra], abc.ABC):
 
         .. versionadded:: 8.0
         """
-        # The class name without the "ParamType" suffix.
-        param_type = type(self).__name__.partition("ParamType")[0]
+        # The class name without a leading underscore marking it private,
+        # and without the "ParamType" suffix.
+        param_type = type(self).__name__.removeprefix("_").partition("ParamType")[0]
         param_type = param_type.partition("ParameterType")[0]
 
         # Custom subclasses might not remember to set a name.
@@ -250,7 +251,7 @@ else:
         func: t.Callable[[t.Any], t.Any]
 
 
-class FuncParamType(ParamType[_ValueT_co], t.Generic[_ValueT_contra, _ValueT_co]):
+class _FuncParamType(ParamType[_ValueT_co], t.Generic[_ValueT_contra, _ValueT_co]):
     name: str
     func: t.Callable[[_ValueT_contra], _ValueT_co]
 
@@ -415,7 +416,7 @@ class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
     def get_metavar(self, param: Parameter, ctx: Context) -> str | None:
         if param.param_type_name == "option" and not param.show_choices:  # type: ignore[attr-defined]
             choice_metavars = [
-                convert_type(type(choice)).name.upper() for choice in self.choices
+                _convert_type(type(choice)).name.upper() for choice in self.choices
             ]
             choices_str = "|".join([*dict.fromkeys(choice_metavars)])
         else:
@@ -1255,7 +1256,7 @@ class Tuple(CompositeParamType[tuple[t.Any, ...]]):
     """
 
     def __init__(self, types: cabc.Sequence[type[t.Any] | ParamType[t.Any]]) -> None:
-        self.types: cabc.Sequence[ParamType[t.Any]] = [convert_type(ty) for ty in types]
+        self.types: cabc.Sequence[ParamType[t.Any]] = [_convert_type(ty) for ty in types]
 
     def to_info_dict(self) -> TupleInfoDict:
         return {
@@ -1312,7 +1313,7 @@ def _guess_type(
     if not isinstance(default, (tuple, list)):
         return type(default)
 
-    # If the default is empty, return None so convert_type falls
+    # If the default is empty, return None so _convert_type falls
     # through to STRING.
     if not default:
         return None
@@ -1320,7 +1321,7 @@ def _guess_type(
     item = default[0]
 
     # A sequence of iterables needs to detect the inner types.
-    # Can't call convert_type recursively because that would
+    # Can't call _convert_type recursively because that would
     # incorrectly unwind the tuple to a single type.
     if isinstance(item, (tuple, list)):
         return tuple(map(type, item))
@@ -1329,16 +1330,16 @@ def _guess_type(
 
 
 @t.overload
-def convert_type(ty: None, default: None = None) -> StringParamType: ...
+def _convert_type(ty: None, default: None = None) -> StringParamType: ...
 @t.overload
-def convert_type(
+def _convert_type(
     ty: type | ParamType[t.Any], default: t.Any | None = None
 ) -> ParamType[t.Any]: ...
 @t.overload
-def convert_type(
+def _convert_type(
     ty: t.Any | None, default: t.Any | None = None
 ) -> ParamType[t.Any]: ...
-def convert_type(
+def _convert_type(
     ty: t.Any | None = None, default: t.Any | None = None
 ) -> ParamType[t.Any]:
     """Find the most appropriate :class:`ParamType` for the given Python
@@ -1379,7 +1380,7 @@ def convert_type(
             # guessed is an instance (correct), so issubclass fails.
             pass
 
-    return FuncParamType(guessed)
+    return _FuncParamType(guessed)
 
 
 #: A dummy parameter type that just does nothing.  From a user's
@@ -1420,3 +1421,18 @@ class OptionHelpExtra(t.TypedDict, total=False):
     default: str
     range: str
     required: str
+
+
+def __getattr__(name: str) -> object:
+    import warnings
+
+    if name in {"convert_type", "FuncParamType"}:
+        warnings.warn(
+            f"'types.{name}' is deprecated and will be removed in Click 9.0."
+            " It is an internal utility, use the public parameter types instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[f"_{name}"]
+
+    raise AttributeError(name)
