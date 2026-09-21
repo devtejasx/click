@@ -129,6 +129,36 @@ def test_strip_ansi_removes_full_sequence(seq):
     assert term_len(f"a{seq}b") == 2
 
 
+OSC_FOREIGN = [
+    # OSC 8 hyperlink, opened and closed, terminated by ST (ESC \) or BEL.
+    f"{ESC}]8;;https://example.com{ESC}\\",
+    f"{ESC}]8;;{ESC}\\",
+    f"{ESC}]8;id=1;https://example.com\a",
+    # OSC 0 window title.
+    f"{ESC}]0;my title\a",
+]
+
+
+@pytest.mark.parametrize("seq", OSC_FOREIGN)
+def test_strip_ansi_removes_osc_sequence(seq):
+    """OSC sequences from other tools (hyperlinks, titles) are stripped too."""
+    assert strip_ansi(seq) == ""
+    assert strip_ansi(f"a{seq}b") == "ab"
+    assert term_len(f"a{seq}b") == 2
+
+
+def test_strip_ansi_hyperlink_keeps_link_text():
+    link = f"{ESC}]8;;https://example.com{ESC}\\docs{ESC}]8;;{ESC}\\"
+    assert strip_ansi(link) == "docs"
+    assert click.unstyle(f"see {link}!") == "see docs!"
+    assert term_len(link) == 4
+
+
+def test_truncate_visible_does_not_cut_inside_osc():
+    link = f"{ESC}]8;;https://example.com{ESC}\\docs{ESC}]8;;{ESC}\\"
+    assert _truncate_visible(link, 2) == f"{ESC}]8;;https://example.com{ESC}\\do"
+
+
 @pytest.mark.parametrize("final", ["m", "H", "J", "A", "z"])
 @pytest.mark.parametrize("params", ["", "0", "1;2", ";", "?25", "0;0;0"])
 def test_strip_ansi_is_superset_of_legacy(params, final):

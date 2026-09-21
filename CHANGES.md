@@ -11,6 +11,9 @@ Unreleased
   returns `None` for hidden options, so help screens are unchanged. {pr}`3821`
 - Document which types are inferred from `default`, and what an unrecognized
   `type` callable does to a command-line value. {issue}`3036` {pr}`3808`
+- `unstyle`, the color stripping in `echo`, and help-text wrapping also
+  strip OSC escape sequences, such as OSC 8 hyperlinks, instead of only CSI
+  sequences.
 
 ## Version 8.5.0
 

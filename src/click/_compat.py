@@ -15,8 +15,9 @@ WIN = sys.platform.startswith("win")
 # One CSI escape sequence per the ECMA-48 grammar: parameter bytes (0x30-0x3F),
 # intermediate bytes (0x20-0x2F), then a final byte (0x40-0x7E). Broader than the
 # SGR codes Click emits, so foreign sequences (colon-delimited true-color, mouse
-# reporting) are stripped too.
-_ansi_re = re.compile(r"\033\[[0-?]*[ -/]*[@-~]")
+# reporting) are stripped too. Also one OSC sequence, ESC ] ... terminated by BEL
+# or ST (ESC \), such as an OSC 8 hyperlink or a window title set by other tools.
+_ansi_re = re.compile(r"\033(?:\[[0-?]*[ -/]*[@-~]|\][^\007\033]*(?:\007|\033\\))")
 
 
 def _make_text_stream(
