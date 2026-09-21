@@ -11,6 +11,10 @@ Unreleased
   returns `None` for hidden options, so help screens are unchanged. {pr}`3821`
 - Document which types are inferred from `default`, and what an unrecognized
   `type` callable does to a command-line value. {issue}`3036` {pr}`3808`
+- {meth}`Context.get_parameter_source` works in a command run with
+  {meth}`Context.invoke` or {meth}`Context.forward`. Values filled in from
+  defaults report `DEFAULT` or `DEFAULT_MAP`, and forwarded values keep the
+  source they had in the forwarding command. {issue}`2753`
 
 ## Version 8.5.0
 

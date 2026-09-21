@@ -774,6 +774,65 @@ def test_parameter_source(runner, option_args, invoke_args, expect):
     assert rv.return_value == expect
 
 
+def _source_reporting_command():
+    @click.command()
+    @click.option("--count", default=1)
+    @click.option("--name", default="x")
+    @click.pass_context
+    def target(ctx, count, name):
+        return ctx.get_parameter_source("count"), ctx.get_parameter_source("name")
+
+    return target
+
+
+def test_parameter_source_invoke_fills_default():
+    """A parameter ``invoke`` fills in from its default reports ``DEFAULT``."""
+    target = _source_reporting_command()
+
+    @click.command()
+    @click.pass_context
+    def cli(ctx):
+        return ctx.invoke(target, count=42)
+
+    rv = cli.main([], standalone_mode=False)
+    # count was passed explicitly, name came from its default
+    assert rv == (None, ParameterSource.DEFAULT)
+
+
+def test_parameter_source_invoke_default_map():
+    target = _source_reporting_command()
+
+    @click.group(invoke_without_command=True)
+    @click.pass_context
+    def cli(ctx):
+        return ctx.invoke(target)
+
+    cli.add_command(target, "target")
+    rv = cli.main([], standalone_mode=False, default_map={"target": {"count": 3}})
+    assert rv == (ParameterSource.DEFAULT_MAP, ParameterSource.DEFAULT)
+
+
+@pytest.mark.parametrize(
+    ("args", "expect"),
+    [
+        ([], ParameterSource.DEFAULT),
+        (["--count", "5"], ParameterSource.COMMANDLINE),
+    ],
+)
+def test_parameter_source_forward_keeps_source(args, expect):
+    """``forward`` passes on each value's source along with the value."""
+    target = _source_reporting_command()
+
+    @click.command()
+    @click.option("--count", default=1)
+    @click.pass_context
+    def cli(ctx, count):
+        return ctx.forward(target)
+
+    rv = cli.main(args, standalone_mode=False)
+    assert rv == (expect, ParameterSource.DEFAULT)
+
+
 def test_propagate_opt_prefixes():
     parent = click.Context(click.Command("test"))
     parent._opt_prefixes = {"-", "--", "!"}

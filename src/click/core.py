@@ -876,48 +876,27 @@ class Context:
             All ``kwargs`` are tracked in :attr:`params` so they will be
             passed if :meth:`forward` is called at multiple levels.
 
+        .. versionchanged:: 8.5.1
+            Parameters filled in from defaults have their
+            :meth:`get_parameter_source` set to ``DEFAULT`` or
+            ``DEFAULT_MAP``.
+
         .. versionchanged:: 3.2
             A new context is created, and missing arguments use default values.
         """
         if isinstance(callback, Command):
-            other_cmd = callback
+            return self._invoke_command(callback, args, kwargs, {})
 
-            if other_cmd.callback is None:
-                raise TypeError(
-                    "The given command does not have a callback that can be invoked."
-                )
-            else:
-                callback = t.cast("t.Callable[..., V]", other_cmd.callback)
-
-            ctx = self._make_sub_context(other_cmd)
-
-            for param in other_cmd.params:
-                if param.name not in kwargs and param.expose_value:
-                    default_value = param.get_default(ctx)
-                    # We explicitly hide the :attr:`UNSET` value to the user, as we
-                    # choose to make it an implementation detail. And because ``invoke``
-                    # has been designed as part of Click public API, we return ``None``
-                    # instead. Refs:
-                    # https://github.com/pallets/click/issues/3066
-                    # https://github.com/pallets/click/issues/3065
-                    # https://github.com/pallets/click/pull/3068
-                    if default_value is UNSET:
-                        default_value = None
-                    kwargs[param.name] = param.type_cast_value(ctx, default_value)
-
-            # Track all kwargs as params, so that forward() will pass
-            # them on in subsequent calls.
-            ctx.params.update(kwargs)
-        else:
-            ctx = self
-
-        with augment_usage_errors(self), ctx:
+        with augment_usage_errors(self), self:
             return callback(*args, **kwargs)
 
     def forward(self, cmd: Command, /, *args: t.Any, **kwargs: t.Any) -> t.Any:
         """Similar to :meth:`invoke` but fills in default keyword
         arguments from the current context if the other command expects
         it.  This cannot invoke callbacks directly, only other commands.
+
+        .. versionchanged:: 8.5.1
+            Each forwarded value keeps its :meth:`get_parameter_source`.
 
         .. versionchanged:: 8.0
             All ``kwargs`` are tracked in :attr:`params` so they will be
@@ -927,11 +906,71 @@ class Context:
         if not isinstance(cmd, Command):
             raise TypeError("Callback is not a command.")
 
+        sources: dict[str, ParameterSource] = {}
+
         for param in self.params:
             if param not in kwargs:
                 kwargs[param] = self.params[param]
+                source = self.get_parameter_source(param)
 
-        return self.invoke(cmd, *args, **kwargs)
+                if source is not None:
+                    sources[param] = source
+
+        return self._invoke_command(cmd, args, kwargs, sources)
+
+    def _invoke_command(
+        self,
+        other_cmd: Command,
+        args: tuple[t.Any, ...],
+        kwargs: dict[str, t.Any],
+        sources: dict[str, ParameterSource],
+    ) -> t.Any:
+        """Invoke another command's callback in a new sub-context, filling in
+        defaults for the parameters missing from ``kwargs``.
+
+        ``sources`` gives the :class:`ParameterSource` of values passed on
+        from this context by :meth:`forward`. Parameters filled in from
+        defaults are recorded as ``DEFAULT`` or ``DEFAULT_MAP``, as they would
+        be for a parsed command. Values passed explicitly have no source.
+        """
+        if other_cmd.callback is None:
+            raise TypeError(
+                "The given command does not have a callback that can be invoked."
+            )
+
+        callback = other_cmd.callback
+        ctx = self._make_sub_context(other_cmd)
+
+        for name, source in sources.items():
+            ctx.set_parameter_source(name, source)
+
+        for param in other_cmd.params:
+            if param.name not in kwargs and param.expose_value:
+                if ctx._default_map_has(param.name) or (
+                    ctx.lookup_default(param.name, call=False) is not None
+                ):
+                    ctx.set_parameter_source(param.name, ParameterSource.DEFAULT_MAP)
+                else:
+                    ctx.set_parameter_source(param.name, ParameterSource.DEFAULT)
+
+                default_value = param.get_default(ctx)
+                # We explicitly hide the :attr:`UNSET` value to the user, as we
+                # choose to make it an implementation detail. And because ``invoke``
+                # has been designed as part of Click public API, we return ``None``
+                # instead. Refs:
+                # https://github.com/pallets/click/issues/3066
+                # https://github.com/pallets/click/issues/3065
+                # https://github.com/pallets/click/pull/3068
+                if default_value is UNSET:
+                    default_value = None
+                kwargs[param.name] = param.type_cast_value(ctx, default_value)
+
+        # Track all kwargs as params, so that forward() will pass
+        # them on in subsequent calls.
+        ctx.params.update(kwargs)
+
+        with augment_usage_errors(self), ctx:
+            return callback(*args, **kwargs)
 
     def set_parameter_source(self, name: str, source: ParameterSource) -> None:
         """Set the source of a parameter. This indicates the location
@@ -953,6 +992,10 @@ class Context:
 
         :param name: The name of the parameter.
         :rtype: ParameterSource
+
+        For a command run with :meth:`invoke` or :meth:`forward`, a value
+        passed explicitly as a keyword argument has no source and returns
+        ``None``.
 
         .. versionchanged:: 8.0
             Returns ``None`` if the parameter was not provided from any
