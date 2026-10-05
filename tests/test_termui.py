@@ -594,6 +594,24 @@ def test_editor_windows_path_normalization(editor_cmd, expected_cmd):
         assert mock_popen.call_args[1].get("shell") is None
 
 
+@pytest.mark.parametrize("text", ["a\nb\n", "a\r\nb\r\n", "a\r\nb"])
+def test_edit_windows_line_endings_not_doubled(monkeypatch, text):
+    """On Windows the text is written with \\r\\n line endings. Text that
+    already has them must not become \\r\\r\\n."""
+    monkeypatch.setattr(click._termui_impl, "WIN", True)
+    seen = []
+
+    def edit_files(self, filenames):
+        with open(filenames[0], "rb") as f:
+            seen.append(f.read())
+
+    monkeypatch.setattr(Editor, "edit_files", edit_files)
+    result = Editor(require_save=False).edit(text)
+
+    assert seen == [b"\xef\xbb\xbfa\r\nb\r\n"]
+    assert result == "a\nb\n"
+
+
 def test_editor_env_passed_through():
     with patch("subprocess.Popen") as mock_popen:
         mock_popen.return_value.wait.return_value = 0

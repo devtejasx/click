@@ -760,7 +760,11 @@ class Editor:
                 text += "\n"
 
             if WIN:
-                data = text.replace("\n", "\r\n").encode("utf-8-sig")
+                # Normalize first, so text that already uses \r\n does not
+                # reach the editor as \r\r\n.
+                data = (
+                    text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8-sig")
+                )
             else:
                 data = text.encode("utf-8")
 
