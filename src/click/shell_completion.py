@@ -13,6 +13,7 @@ from .core import Group
 from .core import Option
 from .core import Parameter
 from .core import ParameterSource
+from .exceptions import UsageError
 from .utils import echo
 
 
@@ -693,6 +694,20 @@ def _is_incomplete_option(ctx: Context, args: list[str], param: Parameter) -> bo
     return last_option is not None and last_option in param.opts
 
 
+def _resolve_command(
+    command: Group, ctx: Context, args: list[str]
+) -> tuple[str | None, Command | None, list[str]]:
+    """Resolve a subcommand while completing. A :exc:`UsageError` from
+    :meth:`Group.get_command`, such as a custom group reporting an
+    ambiguous prefix, means there is no subcommand to complete into,
+    instead of failing the completion with a traceback.
+    """
+    try:
+        return command.resolve_command(ctx, args)
+    except UsageError:
+        return None, None, args
+
+
 def _resolve_context(
     cli: Command,
     ctx_args: cabc.MutableMapping[str, t.Any],
@@ -716,7 +731,7 @@ def _resolve_context(
 
             if isinstance(command, Group):
                 if not command.chain:
-                    name, cmd, args = command.resolve_command(ctx, args)
+                    name, cmd, args = _resolve_command(command, ctx, args)
 
                     if cmd is None:
                         return ctx
@@ -730,7 +745,7 @@ def _resolve_context(
                     sub_ctx = ctx
 
                     while args:
-                        name, cmd, args = command.resolve_command(ctx, args)
+                        name, cmd, args = _resolve_command(command, ctx, args)
 
                         if cmd is None:
                             return ctx

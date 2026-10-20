@@ -19,6 +19,9 @@ Unreleased
   for options, so its value changes from `my_option` to `--my-option`. Click no
   longer reads it, and a subclass that overrides it gets a warning when the class
   is defined. {pr}`3877`
+- Shell completion no longer fails with a traceback when a group's
+  `get_command` raises a `UsageError`, such as an alias group reporting an
+  ambiguous prefix. Completion continues at that group. {issue}`2853`
 
 ## Version 8.5.1
 

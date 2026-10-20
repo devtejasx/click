@@ -105,6 +105,30 @@ def test_chained():
     assert _get_words(cli, ["get"], "s") == ["set", "start"]
 
 
+@pytest.mark.parametrize("chain", [False, True])
+def test_get_command_usage_error(chain):
+    """A group whose get_command fails with a UsageError, such as an
+    alias group with an ambiguous prefix, stops resolving subcommands
+    instead of failing the completion.
+    """
+
+    class PrefixGroup(Group):
+        def get_command(self, ctx, cmd_name):
+            matches = [n for n in self.list_commands(ctx) if n.startswith(cmd_name)]
+            if len(matches) > 1:
+                ctx.fail(f"Too many matches: {', '.join(sorted(matches))}")
+            return super().get_command(ctx, matches[0] if matches else cmd_name)
+
+    cli = PrefixGroup(
+        "cli",
+        chain=chain,
+        params=[Option(["-v"], is_flag=True)],
+        commands=[Command("interface"), Command("ip")],
+    )
+    assert _get_words(cli, ["i"], "") == ["interface", "ip"]
+    assert _get_words(cli, ["i"], "-") == ["-v", "--help"]
+
+
 def test_help_option():
     cli = Group("cli", commands=[Command("with"), Command("no", add_help_option=False)])
     assert _get_words(cli, ["with"], "--") == ["--help"]
