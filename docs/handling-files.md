@@ -53,6 +53,8 @@ For handling paths, the {class}`Path` type is better than a `str`. Some notable 
 - `file_okay` and `dir_okay` allow specifying whether files/directories are accepted.
 - Error messages are nicely formatted using {func}`format_filename` so any undecodable bytes will be printed nicely.
 
+The value is always treated as a local path: the checks run on the filesystem with {mod}`os`, and `path_type` only changes the type of the value passed to your function. Validate paths to remote storage such as S3 in your own code.
+
 See {class}`Path` for all features.
 
 Example:

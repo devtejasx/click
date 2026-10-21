@@ -1061,6 +1061,11 @@ class Path(ParamType[_PathT_co, str | os.PathLike[str]], t.Generic[_PathT_co]):
     returns the filename instead of an open file. Various checks can be
     enabled to validate the type of file and permissions.
 
+    The value is a path on the local filesystem. The checks use
+    :mod:`os` functions on the value as given, whatever ``path_type``
+    is, so paths to remote storage such as S3 can't be validated with
+    this type.
+
     :param exists: The file or directory needs to exist for the value to
         be valid. If this is not set to ``True``, and the file does not
         exist, then all further checks are silently skipped.
@@ -1077,7 +1082,8 @@ class Path(ParamType[_PathT_co, str | os.PathLike[str]], t.Generic[_PathT_co]):
         :func:`~click.open_file` to handle opening this value.
     :param path_type: Convert the incoming path value to this type. If
         ``None``, keep Python's default, which is ``str``. Useful to
-        convert to :class:`pathlib.Path`.
+        convert to :class:`pathlib.Path`. This only changes the type of
+        the returned value, it is applied after the checks.
 
     .. versionchanged:: 8.5.1
         Reveal the actual type of the value as converted from raw input.
