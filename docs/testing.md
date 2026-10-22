@@ -281,3 +281,61 @@ original `fd` through `fileno()`, reverting the change introduced in `8.3.3`
 that broke Pytest's `fd`-level capture teardown. Use `capture="fd"` to restore
 that behavior with proper isolation.
 ```
+
+## Shell Completion
+
+To test the completions your commands and parameter types offer, create a
+{class}`~click.shell_completion.ShellComplete` for your top level command and
+call {meth}`~click.shell_completion.ShellComplete.get_completions` with the
+arguments typed so far and the incomplete value being completed:
+
+```python
+import click
+from click.shell_completion import ShellComplete
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.option("--color", type=click.Choice(["red", "green", "blue"]))
+def paint(color):
+    pass
+
+
+def get_completions(args, incomplete):
+    comp = ShellComplete(cli, {}, "cli", "_CLI_COMPLETE")
+    return [item.value for item in comp.get_completions(args, incomplete)]
+
+
+def test_complete_subcommand():
+    assert get_completions([], "pa") == ["paint"]
+
+
+def test_complete_choice():
+    assert get_completions(["paint", "--color"], "g") == ["green"]
+```
+
+To check the output a shell script receives, invoke the command with the
+completion environment variables set. For Bash, these are the instruction
+variable, `COMP_WORDS` and `COMP_CWORD`:
+
+```python
+from click.testing import CliRunner
+
+
+def test_bash_completion_output():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        prog_name="cli",
+        env={
+            "_CLI_COMPLETE": "bash_complete",
+            "COMP_WORDS": "cli paint --color g",
+            "COMP_CWORD": "3",
+        },
+    )
+    assert result.output == "plain,green\n"
+```
